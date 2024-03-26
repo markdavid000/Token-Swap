@@ -14,7 +14,8 @@ contract CounterTest is Test {
     address DIAUSD = 0x14866185B1962B63C3Ea9E03Bc1da838bab34C19;
 
     // Contract
-    address DAI = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6;
+    address DIA = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6;
+    address LINK = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
 
     function setUp() public {
         tokenSwap = new TokenSwap();
@@ -27,22 +28,60 @@ contract CounterTest is Test {
     }
 
     function testAddLiquidity() public {
+        vm.startPrank(0x61E5E1ea8fF9Dc840e0A549c752FA7BDe9224e99);
+
+        uint256 _linkAmount = 10e18;
+        IERC20(LINK).transfer(
+            0xd0aD7222c212c1869334a680e928d9baE85Dd1d0,
+            _linkAmount
+        );
+        assertEq(
+            IERC20(LINK).balanceOf(0xd0aD7222c212c1869334a680e928d9baE85Dd1d0),
+            _linkAmount
+        );
+        vm.stopPrank();
+
         vm.startPrank(0xd0aD7222c212c1869334a680e928d9baE85Dd1d0);
         uint256 _amount = 10e18;
-        IERC20(DAI).approve(address(tokenSwap), _amount);
-        tokenSwap.AddLiquidity(_amount);
-        uint256 diaBalance = tokenSwap.DIADeposit();
+        IERC20(DIA).approve(address(tokenSwap), _amount);
+
+        IERC20(LINK).approve(address(tokenSwap), _linkAmount);
+        tokenSwap.AddLiquidity(_amount, _linkAmount);
+        uint256 diaBalance = tokenSwap.DIADeposit(DIA);
+        uint256 linkBalance = tokenSwap.LINKDeposit(LINK);
 
         assertEq(diaBalance, _amount);
+        assertEq(linkBalance, _linkAmount);
     }
 
     function testSwapForETH() public {
         testAddLiquidity();
         uint256 _amount = 10e18;
-        tokenSwap.swapTokenForETH(DIAUSD, _amount);
-        uint256 result = tokenSwap.DIADeposit();
+        uint256 _depositAmount = 1e18;
+        uint256 diaDepositBeforeSwap = tokenSwap.DIADeposit(DIA);
+        tokenSwap.swapTokenForETH(DIAUSD, _depositAmount);
+        uint256 diaDepositAfterSwap = tokenSwap.DIADeposit(DIA);
 
-        assertLt(result, _amount);
+        assertEq(diaDepositBeforeSwap, _amount);
+        assertNotEq(diaDepositAfterSwap, _amount);
+    }
+
+    function testSwapTokenForToken() public {
+        testAddLiquidity();
+
+        uint256 _depositAmount = 1e18;
+        uint256 _linkDepositAmount = 1e18;
+        uint256 linksDepositBeforeSwap = tokenSwap.LINKDeposit(LINK);
+        tokenSwap.swapTokenForToken(
+            DIA,
+            LINKUSDAddress,
+            _depositAmount,
+            _linkDepositAmount
+        );
+        uint256 linkDepositAfterSwap = tokenSwap.LINKDeposit(LINK);
+
+        assertEq(linksDepositBeforeSwap, _linkDepositAmount);
+        assertNotEq(linkDepositAfterSwap, _linkDepositAmount);
     }
 
     // function testFuzz_SetNumber(uint256 x) public {
